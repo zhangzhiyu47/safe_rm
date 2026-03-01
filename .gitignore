@@ -1,0 +1,30 @@
+# 编译生成的对象文件
+*.o
+*.obj
+
+# 编译生成的可执行文件
+safe_rm
+restore
+zrestore
+
+# 调试文件
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# IDE 和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 测试生成的临时文件
+test_*
+*.tmp
+
+# 核心转储
+core
+core.*
