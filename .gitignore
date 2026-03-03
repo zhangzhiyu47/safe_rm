@@ -22,9 +22,12 @@ zrestore
 .DS_Store
 
 # 测试生成的临时文件
-test_*
+test*
 *.tmp
 
 # 核心转储
 core
 core.*
+
+# AI 生成文件
+AGENTS.md

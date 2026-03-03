@@ -210,8 +210,8 @@ void print_help(const char *program_name) {
     printf("  %s [选项] <文件1> [文件2] ...\n\n", program_name);
     printf("选项:\n");
     printf("  --remove-completely  彻底删除文件（带打字验证）\n");
-    printf("  --help               显示此帮助信息\n");
-    printf("  --version            显示版本信息\n\n");
+    printf("  -h, --help           显示此帮助信息\n");
+    printf("  -v, --version        显示版本信息\n\n");
     printf("模式:\n");
     printf("  默认模式（无选项）: 将文件移动到回收站（安全删除）\n");
     printf("  --remove-completely: 彻底删除文件，需通过打字验证\n\n");
