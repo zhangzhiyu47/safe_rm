@@ -9,6 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         target:
           - x86_64-unknown-linux-gnu
@@ -31,7 +32,13 @@ jobs:
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+
+      - name: Configure cargo for cross compile
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          echo '[target.aarch64-unknown-linux-gnu]' >> ~/.cargo/config.toml
+          echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config.toml
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -46,17 +53,22 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package binary
+        env:
+          BINARY_NAME: ${{ github.event.repository.name }}
+          ARCH: ${{ matrix.arch_name }}
+          VERSION: ${{ github.ref_name }}
         run: |
-          BINARY_NAME="${{ github.event.repository.name }}"
-          mkdir -p "dist/${{ matrix.arch_name }}"
-          cp "target/${{ matrix.target }}/release/${BINARY_NAME}" "dist/${{ matrix.arch_name }}/${BINARY_NAME}"
-          tar -czf "dist/${BINARY_NAME}-${GITHUB_REF_NAME}-linux-${{ matrix.arch_name }}.tar.gz" -C "dist/${{ matrix.arch_name }}" "${BINARY_NAME }}"
+          mkdir -p "dist/${ARCH}"
+          cp "target/${{ matrix.target }}/release/${BINARY_NAME}" "dist/${ARCH}/${BINARY_NAME}"
+          cd dist
+          tar -czf "${BINARY_NAME}-${VERSION}-linux-${ARCH}.tar.gz" -C "${ARCH}" "${BINARY_NAME}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.repository.name }}-${{ matrix.arch_name }}
           path: dist/*.tar.gz
+          if-no-files-found: error
 
   release:
     needs: build
@@ -64,8 +76,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
