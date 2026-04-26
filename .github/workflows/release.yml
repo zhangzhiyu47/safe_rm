@@ -74,52 +74,45 @@ jobs:
           path: dist/*.tar.gz
           if-no-files-found: error
 
-  build-termux:
-    name: Build Termux ARM64
+  build-musl:
+    name: Build Static MUSL ARM64
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          platforms: arm64
+          targets: aarch64-unknown-linux-musl
 
-      - name: Build in Termux Docker
-        uses: addnab/docker-run-action@v3
-        with:
-          image: termux/termux-docker:aarch64
-          options: |
-            --platform linux/arm64
-            -v ${{ github.workspace }}:/workspace
-            -w /workspace
-            -e CARGO_HOME=/workspace/.cargo-termux
-          run: |
-            # Update packages
-            pkg update -y
-            pkg install -y rust cargo binutils-is-llvm
-            # Build release
-            cargo build --release
-            # Verify binaries
-            file target/release/safe_rm
-            file target/release/restore
-            file target/release/zrestore
+      - name: Install cross
+        run: cargo install cross
 
-      - name: Package Termux binaries
+      - name: Build release with cross
+        run: cross build --release --target aarch64-unknown-linux-musl
+
+      - name: Verify static linking
+        run: |
+          file target/aarch64-unknown-linux-musl/release/safe_rm
+          ldd target/aarch64-unknown-linux-musl/release/safe_rm 2>&1 || true
+          ldd target/aarch64-unknown-linux-musl/release/restore 2>&1 || true
+          ldd target/aarch64-unknown-linux-musl/release/zrestore 2>&1 || true
+
+      - name: Package static binaries
         env:
           VERSION: ${{ github.ref_name }}
         run: |
-          mkdir -p dist/termux-arm64
-          cp "target/release/safe_rm" "dist/termux-arm64/"
-          cp "target/release/restore" "dist/termux-arm64/"
-          cp "target/release/zrestore" "dist/termux-arm64/"
+          mkdir -p dist/static-arm64
+          cp "target/aarch64-unknown-linux-musl/release/safe_rm" "dist/static-arm64/"
+          cp "target/aarch64-unknown-linux-musl/release/restore" "dist/static-arm64/"
+          cp "target/aarch64-unknown-linux-musl/release/zrestore" "dist/static-arm64/"
           cd dist
-          tar -czf "safe_rm-${VERSION}-termux-arm64.tar.gz" -C termux-arm64 .
+          tar -czf "safe_rm-${VERSION}-linux-arm64-static.tar.gz" -C static-arm64 .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: termux-arm64
+          name: static-arm64
           path: dist/*.tar.gz
           if-no-files-found: error
 
@@ -145,7 +138,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-linux, build-termux, build-src]
+    needs: [build-linux, build-musl, build-src]
     runs-on: ubuntu-latest
     permissions:
       contents: write
