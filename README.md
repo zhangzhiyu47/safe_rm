@@ -1,175 +1,144 @@
-# SafeRm - Rust Version
+# SafeRm - Safe Deletion Tool
 
-A safe deletion tool as an alternative to Linux `rm` command, providing a "rubbish bin" mechanism and "typing verification" double protection.
-
-This is a Rust rewrite of the original C version, using modern Rust libraries:
-- `tar` + `flate2` instead of hand-written tar/gzip implementation
-- `ratatui` instead of ncurses
-- `clap` for command line parsing
-- `chrono` for time handling
+SafeRm is a command-line safe deletion tool that moves files to a rubbish bin instead of permanently deleting them. It provides automatic maintenance, a TUI management interface, and batch operations.
 
 ## Features
 
-### safe_rm - Safe Deletion Tool
-- **Safe Delete (default)**: Move files to rubbish bin (~/.rubbishbin/) instead of permanent deletion
-- **Complete Delete**: With typing verification mechanism to prevent accidental deletion, real-time character-level color feedback
-- **Safety Check**: Prevent deletion of rubbish bin or its parent directories
-- **Auto Cleanup**: Empty directories are automatically cleaned up after delete/restore
+- **Safe Deletion**: Moves files to `~/.rubbishbin` instead of permanent deletion
+- **Automatic Maintenance**: Daemon (`trashd`) compresses old directories and cleans up expired archives
+- **TUI Manager** (`zrestore`): Interactive terminal interface with search, batch operations, and progress display
+- **CLI Manager** (`restore`): Command-line tool for listing, restoring, and deleting items
+- **Cache System**: Fast item listing with HMAC signature verification
+- **Archives**: Groups of old directories are compressed into `.tar.gz` archives with manifests
+- **Batch Operations**: Parallel processing of restores and deletions with progress reporting
+- **Bilingual**: English and Chinese support in the TUI
 
-### restore - Command Line Rubbish Bin Management Tool
-- List all restorable items (with adaptive screen size)
-- Restore items by ID
-- Restore all items
-- Permanently delete items
-- Empty rubbish bin
-- **Cache Support**: Fast loading with automatic cache (5 min expiry), auto-detects external changes
-
-### zrestore - Interactive Rubbish Bin Management Tool (TUI)
-- Beautiful htop-style interface (using ratatui)
-- Keyboard navigation
-- Real-time search (exact/fuzzy)
-- Multi-select operations
-- Colorful display
-- Confirmation dialogs
-- Language switching (English/Chinese)
-- **Lazy Loading**: Only renders visible items for large lists
-- **Cache Support**: Fast startup with automatic cache
-
-## Quick Start (Pre-built Binaries)
-
-Pre-built binaries are included in the `bin/` directory:
+## Installation
 
 ```bash
-# Set execute permissions
-chmod +x bin/safe_rm bin/restore bin/zrestore bin/trashd
-
-# Copy to system directory
-sudo cp bin/safe_rm bin/restore bin/zrestore bin/trashd /usr/local/bin/
-
-# Or copy to user directory
-mkdir -p ~/.local/bin
-cp bin/safe_rm bin/restore bin/zrestore bin/trashd ~/.local/bin/
-```
-
-## Build from Source
-
-### Install Rust
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-```
-
-### Build
-```bash
-cd safe_rm_rust
 cargo build --release
 ```
 
-The compiled binaries will be in `target/release/`.
+The binaries will be available in `target/release/`:
+
+- `safe_rm` - Main deletion tool
+- `restore` - CLI rubbish bin manager
+- `zrestore` - TUI rubbish bin manager
 
 ## Usage
 
 ### safe_rm
+
 ```bash
-safe_rm file.txt                    # Safe delete (move to rubbish bin)
-safe_rm --remove-completely file.txt # Permanently delete
+# Safe delete files
+safe_rm file.txt directory/
+
+# Force mode (no output)
+safe_rm -f file.txt
+
+# Permanently delete (with typing verification)
+safe_rm --remove-completely file.txt
+
+# Trigger maintenance daemon
+safe_rm --trigger
+
+# Stop daemon
+safe_rm --stop
+
+# Check daemon status
+safe_rm --status
 ```
 
-### restore
+### restore (CLI)
+
 ```bash
-restore -l              # List all items
-restore 1               # Restore item with ID=1
-restore -a              # Restore all items
-restore -d 1 2          # Permanently delete items
-restore --delete-all    # Empty rubbish bin
+# List all restorable items
+restore -l
+
+# Restore item by ID
+restore 1
+
+# Restore all items
+restore -a
+
+# Delete items permanently by ID
+restore -d 1
+restore -d 2
+restore -d 3
+
+# Delete all items
+restore --delete-all
 ```
 
 ### zrestore (TUI)
+
 ```bash
-zrestore                # Start interactive TUI
-zrestore -l             # List mode
+# Launch interactive TUI
+zrestore
+
+# List items in plain text
+zrestore -l
 ```
 
-### trashd - Daemon for Automatic Maintenance
-```bash
-trashd                  # Start the daemon
-trashd --stop           # Stop the running daemon
-trashd --status         # Check if daemon is running
-trashd --trigger        # Trigger maintenance immediately
-```
+#### TUI Keybindings
 
-**Daemon Features:**
-- **Auto-compression**: Compresses old directories (older than 3 days) to save space
-- **Keep uncompressed**: Retains latest 20 directories in uncompressed form
-- **Auto-cleanup**: Deletes archives older than 60 days
-- **Signal-driven**: Triggered by `safe_rm` after each deletion
-- **Single instance**: File lock ensures only one daemon runs at a time
+- `↑` / `↓` / `k` / `j` - Navigate
+- `Space` - Toggle selection
+- `a` - Select all
+- `A` - Deselect all
+- `Enter` - Restore current item
+- `r` - Restore selected items
+- `R` - Restore all visible items
+- `d` - Delete selected items
+- `D` - Delete all visible items
+- `/` - Search
+- `Tab` - Toggle exact/fuzzy search
+- `L` - Switch language (English/Chinese)
+- `?` / `h` / `F1` - Show help
+- `q` - Quit
 
-**Keyboard Shortcuts:**
+## Daemon Maintenance Policy
 
-| Key | Function |
-|-----|----------|
-| `↑/↓` or `k/j` | Navigate up/down |
-| `PgUp/PgDn` | Page up/down |
-| `Home/End` | Jump to first/last |
-| `Space` | Select/deselect current item |
-| `a` | Select all matching items |
-| `A` | Deselect all |
-| `Enter` | Restore current item |
-| `r` | Restore selected items |
-| `R` | Restore all visible items |
-| `d` | Delete selected items (permanent) |
-| `D` | Delete all visible items |
-| `/` or `s/S` | Open search box |
-| `Tab` | Toggle search mode (Exact/Fuzzy) |
-| `L` | Toggle language (EN/CN) |
-| `Esc` | Clear search filter / Close dialog |
-| `?` or `h/H` or `F1` | Show help |
-| `q/Q` | Quit |
+The `trashd` daemon performs automatic maintenance:
 
-**Search Mode:**
-- Press `/` to open search box
-- Type to filter items
-- Press `Tab` to toggle between Exact/Fuzzy mode
-- Press `Enter` to confirm search
-- Press `Esc` to clear and close search box
+- **Compression**: When more than 20 timestamp directories exist, the oldest directories (older than 3 days) are compressed into `.tar.gz` archives in groups of 100
+- **Cleanup**: Archives older than 60 days are automatically deleted
+- **Fully Deleted Cleanup**: Archives where all items have been permanently deleted are removed immediately
 
 ## Directory Structure
 
 ```
 ~/.rubbishbin/
-├── YYYY-MM-DD-HH:MM:SS/     # Timestamp directory
-│   ├── 1/
-│   │   ├── info              # Absolute path of original directory
-│   │   └── rubbish/          # Actual moved files
-│   │       └── filename
-│   └── 2/
-│       └── ...
-└── old/                      # Archive directory
-    └── YYYY-MM-DD-HH:MM:SS.tar.gz
+├── 2025-01-01-12:00:00/       # Timestamp directories
+│   └── 1/                      # Index directories
+│       ├── info                # Original path information
+│       └── rubbish/            # Deleted files
+├── .old/                       # Archives directory
+│   ├── 2025-01-01-12:00:00.tar.gz
+│   └── 2025-01-01-12:00:00.tar.gz.manifest.json
+├── .cache/
+│   └── items.json              # Cache file
+└── .daemon/
+    ├── trashd.pid              # Daemon PID file
+    └── daemon.log              # Daemon log
 ```
 
-## Safety Rules
+## Safety Features
 
-1. **Never delete** `$HOME/.rubbishbin` or any of its contents
-2. **Never delete** parent directory of rubbish bin (e.g., `/home`, `/`)
-3. **Never overwrite** existing files during restore (skip conflicts)
-4. **Confirmation required** before permanent deletion from rubbish bin
+- **Rubbish Bin Protection**: Cannot delete the rubbish bin or its parent directory
+- **Path Validation**: Blocks deletion of `.`, `..`, root directory, and current working directory
+- **Permanent Deletion Confirmation**: Requires typing verification for `--remove-completely`
+- **Symlink Handling**: Symbolic links are permanently removed (not moved to rubbish bin)
+- **Cache Integrity**: HMAC-SHA256 signature verification prevents tampering
 
 ## Dependencies
 
-- `clap` - Command line argument parsing
-- `chrono` - Date/time handling
-- `tar` - Tar archive
-- `flate2` - Gzip compression/decompression
-- `ratatui` - TUI interface
-- `crossterm` - Terminal control
-- `anyhow` - Error handling
-- `dirs` - Directory paths
-- `tempfile` - Temporary files
-- `nix` - Unix system calls (signals, processes, file locks)
-- `libc` - Low-level system interfaces
-- `regex` - Regular expression matching
+- **Rust**: 1.70+
+- **Core Libraries**: `anyhow`, `chrono`, `serde`, `rayon`, `sha2`, `hmac`, `base64`
+- **System**: `nix`, `libc`
+- **TUI**: `ratatui`, `crossterm`
+- **File Watching**: `notify`
+- **Compression**: `flate2`, `tar`
 
 ## License
 
