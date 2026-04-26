@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Package binary
+        run: |
+          BINARY_NAME="${{ github.event.repository.name }}"
+          mkdir -p dist
+          cp "target/release/${BINARY_NAME}" "dist/${BINARY_NAME}"
+          tar -czf "dist/${BINARY_NAME}-${GITHUB_REF_NAME}-linux.tar.gz" -C dist "${BINARY_NAME}"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
