@@ -116,29 +116,9 @@ jobs:
           path: dist/*.tar.gz
           if-no-files-found: error
 
-  build-src:
-    name: Build Source Package
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Create source tarball
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: |
-          mkdir -p dist
-          git archive --format=tar.gz --prefix="safe_rm-${VERSION}/" -o "dist/safe_rm-${VERSION}-src.tar.gz" HEAD
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: source
-          path: dist/*.tar.gz
-          if-no-files-found: error
-
   release:
     name: Create GitHub Release
-    needs: [build-linux, build-musl, build-src]
+    needs: [build-linux, build-musl]
     runs-on: ubuntu-latest
     permissions:
       contents: write
