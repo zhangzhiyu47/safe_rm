@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux:
+    name: Build Linux Standard
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            arch_name: amd64
+            packages: ""
+            linker: ""
+          - target: aarch64-unknown-linux-gnu
+            arch_name: arm64
+            packages: gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+            linker: aarch64-linux-gnu-gcc
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.packages != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Configure cargo linker
+        if: matrix.linker != ''
+        run: |
+          mkdir -p .cargo
+          echo '[target.${{ matrix.target }}]' >> .cargo/config.toml
+          echo 'linker = "${{ matrix.linker }}"' >> .cargo/config.toml
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package binaries
+        env:
+          ARCH: ${{ matrix.arch_name }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p "dist/${ARCH}"
+          cp "target/${{ matrix.target }}/release/safe_rm" "dist/${ARCH}/"
+          cp "target/${{ matrix.target }}/release/restore" "dist/${ARCH}/"
+          cp "target/${{ matrix.target }}/release/zrestore" "dist/${ARCH}/"
+          cd dist
+          tar -czf "safe_rm-${VERSION}-linux-${ARCH}.tar.gz" -C "${ARCH}" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch_name }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  build-musl:
+    name: Build Static MUSL ARM64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-musl
+
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Build release with cross
+        run: cross build --release --target aarch64-unknown-linux-musl
+
+      - name: Verify static linking
+        run: |
+          file target/aarch64-unknown-linux-musl/release/safe_rm
+          ldd target/aarch64-unknown-linux-musl/release/safe_rm 2>&1 || true
+          ldd target/aarch64-unknown-linux-musl/release/restore 2>&1 || true
+          ldd target/aarch64-unknown-linux-musl/release/zrestore 2>&1 || true
+
+      - name: Package static binaries
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/static-arm64
+          cp "target/aarch64-unknown-linux-musl/release/safe_rm" "dist/static-arm64/"
+          cp "target/aarch64-unknown-linux-musl/release/restore" "dist/static-arm64/"
+          cp "target/aarch64-unknown-linux-musl/release/zrestore" "dist/static-arm64/"
+          cd dist
+          tar -czf "safe_rm-${VERSION}-linux-arm64-static.tar.gz" -C static-arm64 .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-arm64
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: [build-linux, build-musl]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
