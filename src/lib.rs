@@ -25,7 +25,7 @@ static UNIQUE_CTR: Lazy<Mutex<HashMap<PathBuf, u64>>> =
 
 type HmacSha256 = Hmac<Sha256>;
 
-pub const VERSION: &str = "1.0.0";
+pub const VERSION: &str = "1.0.1";
 
 const SALT: &[u8] = b"SafeRmTrashCacheV1";
 

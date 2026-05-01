@@ -126,12 +126,15 @@ fn print_restore_list(items: &[safe_rm::RestoreItem]) {
 }
 
 fn truncate_str(s: &str, max_width: usize) -> String {
-    if s.len() <= max_width {
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() <= max_width {
         s.to_string()
     } else if max_width > 3 {
-        format!("...{}", &s[s.len().saturating_sub(max_width - 3)..])
+        let start = chars.len() - (max_width - 3);
+        let trail: String = chars[start..].iter().collect();
+        format!("...{}", trail)
     } else {
-        s.chars().take(max_width).collect()
+        chars.iter().take(max_width).collect()
     }
 }
 
