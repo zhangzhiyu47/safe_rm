@@ -1,6 +1,6 @@
 [package]
 name = "safe_rm"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["Zhang Zhiyu"]
 description = "Safe rm with trash bin and TUI restore tool"
